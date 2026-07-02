@@ -3,6 +3,7 @@
 ### Prerelease
 
 - 优化: `Day`增加时区配置
+- 优化: `Collection`增加文字颜色和等号键监听
 
 ---
 

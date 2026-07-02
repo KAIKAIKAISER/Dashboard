@@ -35,12 +35,14 @@
           @click="handleKeyClick($event, key)"
         >
           <div class="keys">
-            <div class="keys-name">
-              {{ key }}
+            <div class="keys-name" :style="{ color: componentSetting.textColor }">
+              <svg v-if="key === '='" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" width="12" height="12"><path d="M19 8H5V10H19V8ZM19 14H5V16H19V14Z"></path></svg>
+              <span v-else>{{ key }}</span>
             </div>
             <div
               v-if="userSettingKeyMap[key]"
               class="edit-icon-box"
+              :style="{ color: componentSetting.textColor }"
               @click.stop="showDialog($event, key)"
             >
               <svg viewBox="0 0 24 24" width="12" height="12">
@@ -63,21 +65,10 @@
                 {{ userSettingKeyMap[key].remark.slice(0, 1) }}
               </div>
             </div>
-            <div v-if="userSettingKeyMap[key] && userSettingKeyMap[key].remark" class="mark-text">
+            <div v-if="userSettingKeyMap[key] && userSettingKeyMap[key].remark" class="mark-text" :style="{ color: componentSetting.textColor }">
               {{ userSettingKeyMap[key].remark }}
             </div>
           </div>
-        </div>
-      </div>
-      <div class="keys-wrapper" :style="{ width: '9.08%', padding: `${componentSetting.keyGutter}px` }">
-        <div
-          class="keys-box"
-          :style="{
-            background: componentSetting.keyBackground,
-            borderRadius: componentSetting.keyBorderRadius
-          }"
-        >
-          <div class="keys" />
         </div>
       </div>
     </div>
@@ -90,7 +81,8 @@
     >
       <div v-show="editState.editingActive" class="edit-content" @keydown.stop="">
         <div class="editing-key">
-          {{ editState.editingInfo.key }}
+          <svg v-if="editState.editingInfo.key === '='" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" width="36" height="36"><path d="M19 8H5V10H19V8ZM19 14H5V16H19V14Z"></path></svg>
+          <span v-else>{{ editState.editingInfo.key }}</span>
         </div>
         <el-form ref="form" label-width="110px">
           <el-form-item :label="$t('网站地址')">
@@ -337,14 +329,14 @@ const handleUserKeySave = async () => {
 }
 const handleImgError = (e: any, key: string) => {
   const el = e.currentTarget
-  el.classList.add(`has-error-${key}`)
+  el.classList.add(`has-error-${key === '=' ? 'equal' : key}`)
   el.style.visibility = 'hidden'
   el.nextElementSibling.style.visibility = 'inherit'
 }
 const resetImgError = (key: string) => {
-  const el = document.querySelector(`.material-collection img.has-error-${key}`) as HTMLElement
+  const el = document.querySelector(`.material-collection img.has-error-${key === '=' ? 'equal' : key}`) as HTMLElement
   if (el) {
-    el.classList.remove(`has-error-${key}`)
+    el.classList.remove(`has-error-${key === '=' ? 'equal' : key}`)
     el.style.visibility = 'visible';
     (el.nextElementSibling as HTMLElement).style.visibility = 'hidden'
   }
@@ -556,7 +548,7 @@ const showIconPicker = async () => {
           justify-content: space-around;
           z-index: 2;
           svg path {
-            fill: #464646;
+            fill: currentColor;
           }
           &:hover {
             background: rgba(0,0,0,0.04);

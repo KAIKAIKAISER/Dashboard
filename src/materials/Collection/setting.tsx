@@ -18,6 +18,7 @@ export default {
     keyGutter: 8,
     keyBorderRadius: 4,
     keyBackground: 'rgba(255,255,255,0.9)',
+    textColor: '#363636',
     padding: 10,
     fontFamily: '',
   },
@@ -90,6 +91,10 @@ export default {
       keyBackground: {
         label: '按键背景色',
         slot: () => <standard-color-picker vModel={formData.keyBackground} show-alpha />
+      },
+      textColor: {
+        label: '字体颜色',
+        slot: () => <standard-color-picker vModel={formData.textColor} />
       },
       ...pick(formData, [
         'padding',

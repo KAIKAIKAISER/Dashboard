@@ -95,5 +95,8 @@ export const keyboardMap: Record<string, KeyMapSetting> = {
   },
   M: {
     keyCode: 77
+  },
+  '=': {
+    keyCode: 187
   }
 }
