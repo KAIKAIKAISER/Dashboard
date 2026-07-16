@@ -277,8 +277,7 @@
       "zIndex": 10,
       "i": "8ks7308jdvg",
       "componentSetting": {
-        "weatherMode": 1,
-        "cityName": "",
+        "icaoCode": "ZBAA",
         "duration": 120,
         "position": 5,
         "baseFontSize": 22,

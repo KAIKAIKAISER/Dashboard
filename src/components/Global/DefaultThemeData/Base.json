@@ -282,8 +282,7 @@
       "boxShadow": "",
       "i": "kqtqm8in658",
       "componentSetting": {
-        "weatherMode": 1,
-        "cityName": "",
+        "icaoCode": "ZBAA",
         "duration": 120,
         "position": 5,
         "baseFontSize": 16,

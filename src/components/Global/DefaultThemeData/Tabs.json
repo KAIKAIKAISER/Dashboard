@@ -139,8 +139,7 @@
       "boxShadow": "",
       "i": "kqtqm8in658",
       "componentSetting": {
-        "weatherMode": 1,
-        "cityName": "",
+        "icaoCode": "ZBAA",
         "duration": 120,
         "position": 5,
         "baseFontSize": 16,
@@ -148,8 +147,7 @@
         "textShadow": "0 1px 5px #464646",
         "iconShadow": "0 1px 5px #464646",
         "fontFamily": "",
-        "padding": 10,
-        "animationIcon": true
+        "padding": 10
       },
       "zIndex": 10
     }
