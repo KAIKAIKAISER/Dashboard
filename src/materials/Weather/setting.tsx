@@ -16,7 +16,7 @@ export default {
           maxlength: 4,
           clearable: true
         },
-        tips: 'metar-taf.com 使用机场 ICAO 码查询 METAR / TAF 天气。',
+        tips: '使用机场 ICAO 码获取 METAR / TAF，并可跳转到 metar-taf.com 查看详情。',
         rules: [{
           required: true,
           validator: (_rule: any, value: any, callback: any) => {
@@ -39,7 +39,7 @@ export default {
           style: 'width: 100px'
         },
         unit: 'min',
-        tips: 'METAR 通常每 30–60 分钟更新。'
+        tips: '航空天气数据来自 Aviation Weather Center，最短每 60 分钟刷新。'
       },
       ...pick(formData, ['padding'])
     }
