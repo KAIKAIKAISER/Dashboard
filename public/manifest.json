@@ -8,6 +8,9 @@
   "permissions": [
     "tabs"
   ],
+  "host_permissions": [
+    "https://aviationweather.gov/*"
+  ],
   "background": {
     "service_worker": "sw.js"
   },
@@ -15,14 +18,8 @@
     "default_popup": "popup.html",
     "default_icon": "favicon.png"
   },
-  "sandbox": {
-    "pages": [
-      "weather-frame.html"
-    ]
-  },
   "content_security_policy": {
-    "extension_pages": "script-src 'self'; object-src 'self'",
-    "sandbox": "sandbox allow-scripts allow-popups; default-src 'self'; script-src 'self' https://metar-taf.com; connect-src https://metar-taf.com; img-src 'self' https: data:; style-src 'self' 'unsafe-inline' https:; font-src 'self' https: data:; object-src 'none'; base-uri 'none'; form-action 'none'"
+    "extension_pages": "script-src 'self'; connect-src 'self' https://aviationweather.gov; object-src 'self'"
   },
   "offline_enabled": true,
   "manifest_version": 3,
