@@ -1,0 +1,47 @@
+name: Sync upstream
+
+on:
+  schedule:
+    - cron: '23 3 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: sync-upstream-main
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    if: github.repository == 'KAIKAIKAISER/Dashboard'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the customized main branch
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: main
+
+      - name: Merge upstream while preserving local conflict resolutions
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git remote add upstream https://github.com/leon-kfd/Dashboard.git
+          git fetch --no-tags upstream main
+
+          if git merge-base --is-ancestor upstream/main HEAD; then
+            echo 'Already synchronized with upstream.'
+            exit 0
+          fi
+
+          if ! git merge --no-edit -X ours upstream/main; then
+            git merge --abort
+            echo 'Automatic merge was not safe; manual review is required.' >&2
+            exit 1
+          fi
+
+          git push origin HEAD:main
