@@ -1,0 +1,1 @@
+import{d as e,v as s,o as n,h as o,t as a}from"./index-BUkW3DT-.js";const p=e({name:"Unset",props:{tips:{type:String}}}),r={class:"unset-wrapper"};function c(t,i,_,d,f,m){return n(),o("div",r,a(t.tips||"🔨Wait for setting"),1)}const u=s(p,[["render",c],["__scopeId","data-v-6e85a450"]]);export{u as U};

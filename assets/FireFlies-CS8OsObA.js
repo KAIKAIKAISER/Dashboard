@@ -1,0 +1,1 @@
+import{v as t,o as e,h as s,F as c,j as i,p as o}from"./index-BUkW3DT-.js";const l={class:"fire-flies-wrapper"},n={__name:"FireFlies",setup(_){const r=o(16);return(p,f)=>(e(),s("div",l,[(e(!0),s(c,null,i(r.value,a=>(e(),s("div",{key:a,class:"firefly"}))),128))]))}},d=t(n,[["__scopeId","data-v-48aa5354"]]);export{d as default};
