@@ -93,6 +93,7 @@ import TabsImg from '@/assets/imgs/theme/tabs.gif'
 import { loadHarmonyOSFont } from '@/utils'
 import { langList } from '@/lang'
 import { useI18n } from 'vue-i18n'
+import { normalizeThemeAssets } from '@/utils/theme-assets'
 export default defineComponent({
   name: 'DefaultTheme',
   setup() {
@@ -177,6 +178,7 @@ export default defineComponent({
     const submit = () => {
       const theme = themeList.find((item: any) => item.label === activeTheme.value)
       if (theme && theme.json) {
+        const normalizedTheme = normalizeThemeAssets(theme.json)
         const {
           list,
           affix,
@@ -187,7 +189,7 @@ export default defineComponent({
           showTabSwitchBtn,
           enableKeydownSwitchTab,
           backgroundEffectActive
-        } = theme.json
+        } = normalizedTheme
         global.lang = store.global.lang || 'zh-cn'
         store.updateStates([
           { key: 'tabList', value: tabList },
