@@ -6,6 +6,7 @@ on:
   workflow_dispatch:
 
 permissions:
+  actions: write
   contents: write
 
 concurrency:
@@ -45,3 +46,7 @@ jobs:
           fi
 
           git push origin HEAD:main
+
+          GH_TOKEN="${{ github.token }}" gh workflow run main.deploy.yml \
+            --repo "$GITHUB_REPOSITORY" \
+            --ref main

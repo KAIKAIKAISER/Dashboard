@@ -3,18 +3,22 @@ on:
   push:
     branches:
       - main
+  workflow_dispatch:
+
+permissions:
+  contents: write
 
 jobs:
   main-deploy:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
         with:
           persist-credentials: false
 
       - name: Setup node
-        uses: actions/setup-node@v2
+        uses: actions/setup-node@v4
 
       - name: Install dependencies
         run: yarn
@@ -27,6 +31,23 @@ jobs:
         
       - name: Move CRX file
         run: yarn move:crx
+
+      - name: Upload CRX artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: howdz-dashboard-crx
+          path: dist/howdz-dashboard.crx
+          if-no-files-found: error
+
+      - name: Publish latest CRX release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release delete latest --cleanup-tag --yes || true
+          gh release create latest dist/howdz-dashboard.crx \
+            --target "$GITHUB_SHA" \
+            --title "Latest Dashboard CRX" \
+            --notes "Automatically built from commit $GITHUB_SHA."
       
       #- name: Build Electorn file
       #  run: yarn build:electron
