@@ -24,8 +24,8 @@
     "build": "cross-env VITE_APP_BUILD_MODE=cdn vite build",
     "upload": "node scripts/upload-cdn.cjs",
     "serve": "vite preview",
-    "build:crx": "cross-env VITE_APP_BUILD_MODE=crx vite build",
-    "move:crx": "node scripts/build-crx.cjs",
+    "build:extension": "cross-env VITE_APP_BUILD_MODE=crx vite build",
+    "package:zip": "node scripts/build-zip.cjs",
     "lint": "oxlint src"
   },
   "config": {
