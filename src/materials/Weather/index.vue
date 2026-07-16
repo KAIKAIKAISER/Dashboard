@@ -17,7 +17,9 @@
           target="_blank"
           rel="noopener noreferrer"
         >
-          METAR-TAF ↗
+          <span class="detail-full">METAR-TAF</span>
+          <span class="detail-compact">详情</span>
+          ↗
         </a>
       </header>
 
@@ -42,19 +44,19 @@
           >
             {{ metar.fltCat }}
           </span>
-          <span v-if="metar?.temp != null">
+          <span v-if="metar?.temp != null" class="summary-temp">
             <small>温度</small>{{ formatNumber(metar.temp) }}°C
           </span>
-          <span v-if="metar?.dewp != null">
+          <span v-if="metar?.dewp != null" class="summary-dewpoint">
             <small>露点</small>{{ formatNumber(metar.dewp) }}°C
           </span>
-          <span v-if="windText">
+          <span v-if="windText" class="summary-wind">
             <small>风</small>{{ windText }}
           </span>
-          <span v-if="metar?.visib">
+          <span v-if="metar?.visib" class="summary-visibility">
             <small>能见度</small>{{ metar.visib }} SM
           </span>
-          <span v-if="metar?.altim != null">
+          <span v-if="metar?.altim != null" class="summary-qnh">
             <small>QNH</small>{{ formatNumber(metar.altim) }} hPa
           </span>
         </div>
@@ -253,6 +255,7 @@ onUnmounted(() => {
   height: 100%;
   box-sizing: border-box;
   overflow: hidden;
+  container-type: size;
 }
 
 .weather-card {
@@ -281,12 +284,15 @@ footer {
 }
 
 .station {
+  flex: 1;
   min-width: 0;
   display: flex;
   align-items: baseline;
   gap: 8px;
+  overflow: hidden;
 
   strong {
+    flex: none;
     font-size: 20px;
     letter-spacing: 0.08em;
   }
@@ -304,6 +310,10 @@ footer {
   flex: none;
   color: #7dd3fc;
   text-decoration: none;
+}
+
+.detail-compact {
+  display: none;
 }
 
 .weather-summary {
@@ -401,6 +411,90 @@ footer {
   button:disabled {
     cursor: wait;
     opacity: 0.5;
+  }
+}
+
+@container (max-height: 140px) {
+  .weather-card {
+    gap: 6px;
+    padding: 8px 10px;
+    overflow: hidden;
+  }
+
+  .station strong {
+    font-size: 18px;
+  }
+
+  .detail-link {
+    font-size: 11px;
+  }
+
+  .weather-summary {
+    flex-wrap: nowrap;
+    gap: 5px;
+    overflow: hidden;
+
+    > span {
+      min-width: 0;
+      flex: none;
+      padding: 5px 7px;
+      font-size: 12px;
+      white-space: nowrap;
+    }
+
+    small {
+      display: none;
+    }
+  }
+
+  .weather-summary .flight-category {
+    min-width: 34px;
+    padding-inline: 6px;
+  }
+
+  .reports,
+  footer {
+    display: none;
+  }
+}
+
+@container (max-width: 220px) {
+  .station span,
+  .detail-full,
+  .summary-dewpoint,
+  .summary-visibility,
+  .summary-qnh {
+    display: none;
+  }
+
+  .detail-compact {
+    display: inline;
+  }
+}
+
+@container (max-width: 155px) {
+  .weather-card {
+    padding-inline: 7px;
+  }
+
+  .weather-header {
+    gap: 6px;
+  }
+
+  .summary-wind {
+    max-width: 58px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+}
+
+@container (max-height: 64px) {
+  .weather-card {
+    justify-content: center;
+  }
+
+  .weather-summary {
+    display: none;
   }
 }
 </style>

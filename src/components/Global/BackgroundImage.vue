@@ -8,8 +8,8 @@
     <div v-if="videoURL" :class="['bg-media-wrapper', showBackgroundEffect && 'system-bg-effect']">
       <video
         class="bg-video"
-        crossorigin="anonymous"
         :src="videoURL"
+        preload="auto"
         autoplay
         muted
         loop
