@@ -9,7 +9,8 @@
     "tabs"
   ],
   "host_permissions": [
-    "https://aviationweather.gov/*"
+    "https://aviationweather.gov/*",
+    "https://kongfandong.cn/*"
   ],
   "background": {
     "service_worker": "sw.js"
@@ -19,7 +20,7 @@
     "default_icon": "favicon.png"
   },
   "content_security_policy": {
-    "extension_pages": "script-src 'self'; connect-src 'self' https://aviationweather.gov; object-src 'self'"
+    "extension_pages": "script-src 'self'; connect-src 'self' https://aviationweather.gov https://kongfandong.cn; object-src 'self'"
   },
   "offline_enabled": true,
   "manifest_version": 3,
