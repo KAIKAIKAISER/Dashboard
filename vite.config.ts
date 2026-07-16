@@ -62,6 +62,16 @@ export default defineConfig({
         target: 'http://kongfandong.cn',
         changeOrigin: true,
         rewrite: (path: string) => path.replace(/^\/api/, '')
+      },
+      '/awc-api': {
+        target: 'https://aviationweather.gov',
+        changeOrigin: true,
+        rewrite: (path: string) => path.replace(/^\/awc-api/, '/api/data')
+      },
+      '/awc-cache': {
+        target: 'https://aviationweather.gov',
+        changeOrigin: true,
+        rewrite: (path: string) => path.replace(/^\/awc-cache/, '/data/cache')
       }
     }
   }

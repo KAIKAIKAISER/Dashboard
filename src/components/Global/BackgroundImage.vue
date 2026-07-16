@@ -5,7 +5,7 @@
       background: !backgroundURL ? background : 'none'
     }"
   >
-    <div v-if="videoURL" :class="['bg-media-wrapper', showBackgroundEffect && 'system-bg-effect']">
+    <div v-if="videoURL && !videoLoadFailed" :class="['bg-media-wrapper', showBackgroundEffect && 'system-bg-effect']">
       <video
         class="bg-video"
         :src="videoURL"
@@ -22,6 +22,10 @@
         @error="handleVideoError"
       />
     </div>
+    <div
+      v-else-if="videoURL && videoLoadFailed"
+      :class="['bg-media-wrapper', 'video-fallback', showBackgroundEffect && 'system-bg-effect']"
+    />
     <div v-else-if="iframeURL" :class="['bg-media-wrapper', showBackgroundEffect && 'system-bg-effect']">
       <iframe 
         class="bg-iframe" 
@@ -80,8 +84,6 @@
 <script lang="ts" setup>
 import { computed, ref, watch, onMounted } from 'vue'
 import { useStore } from '@/store'
-import { ElNotification } from 'element-plus'
-import { useI18n } from 'vue-i18n'
 import Icon from '../Tools/Icon.vue'
 import { isSupportIndexDB, localImg, cacheBackgroundImg, setCacheBgImg } from '@/plugins/local-img'
 import request from '@/utils/request'
@@ -94,7 +96,6 @@ const props = defineProps({
   }
 })
 
-const { t } = useI18n()
 const store = useStore()
 
 const time = ref(+new Date())
@@ -227,6 +228,11 @@ const videoURL = computed(() => {
   return ''
 })
 
+const videoLoadFailed = ref(false)
+watch(videoURL, () => {
+  videoLoadFailed.value = false
+})
+
 const iframeURL = computed(() => {
   if (props.background && props.background.includes('url')) {
     const url = getURL(props.background)
@@ -305,11 +311,7 @@ const hanleImgError = async () => {
 }
 
 const handleVideoError = () => {
-  ElNotification({
-    title: t('错误'),
-    type: 'error',
-    message: t('动态视频壁纸加载出错，请重试或更换视频源')
-  })
+  videoLoadFailed.value = true
 }
 
 const like = () => {
@@ -392,6 +394,11 @@ defineExpose({
   width: 100%;
   height: 100%;
   object-fit: cover;
+}
+.video-fallback {
+  background:
+    radial-gradient(circle at 20% 20%, rgba(58, 83, 155, 0.38), transparent 42%),
+    linear-gradient(145deg, #1d2233, #111827);
 }
 .bg-placeholder {
   width: 100%;

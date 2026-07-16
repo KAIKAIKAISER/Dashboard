@@ -6,21 +6,27 @@
     }"
   >
     <section class="weather-card">
+      <button
+        type="button"
+        class="weather-card-trigger"
+        aria-label="点击搜索并选择机场"
+        title="点击搜索并选择机场"
+        @pointerdown.stop
+        @pointerup.stop
+        @mousedown.stop
+        @mouseup.stop
+        @click.stop="openAirportSearch"
+      />
       <header class="weather-header">
         <div class="station">
           <strong>{{ icaoCode }}</strong>
           <span>{{ stationName }}</span>
         </div>
-        <a
-          class="detail-link"
-          :href="detailURL"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <span class="detail-full">METAR-TAF</span>
-          <span class="detail-compact">详情</span>
-          ↗
-        </a>
+        <span class="choose-hint">
+          <span class="choose-full">点击选择机场</span>
+          <span class="choose-compact">切换</span>
+          ⌄
+        </span>
       </header>
 
       <div v-if="loading && !hasData" class="state-message">
@@ -30,7 +36,7 @@
       <div v-else-if="!hasData" class="state-message state-error">
         <strong>暂时无法获取 {{ icaoCode }} 天气</strong>
         <span>{{ errorMessage || '该机场目前没有可用的 METAR / TAF。' }}</span>
-        <a :href="detailURL" target="_blank" rel="noopener noreferrer">
+        <a :href="detailURL" target="_blank" rel="noopener noreferrer" @pointerup.stop @click.stop>
           前往 metar-taf.com 查看
         </a>
       </div>
@@ -85,17 +91,80 @@
             <template v-if="refreshing"> · 更新中…</template>
             <template v-else-if="errorMessage"> · 部分数据更新失败</template>
           </span>
-          <button type="button" :disabled="refreshing" @click="loadWeather">
+          <button type="button" :disabled="refreshing" @pointerup.stop @click.stop="loadWeather">
             刷新
           </button>
         </footer>
       </template>
     </section>
+
+    <easy-dialog
+      v-model="searchVisible"
+      title="搜索并选择机场"
+      width="min(580px, 94vw)"
+      height="min(560px, 82vh)"
+      :close-on-click-outside="true"
+      custom-class="weather-search-dialog"
+    >
+      <div class="airport-search" @click.stop>
+        <form class="search-form" @submit.prevent="runAirportSearch">
+          <input
+            ref="searchInput"
+            v-model.trim="searchKeyword"
+            type="search"
+            autocomplete="off"
+            spellcheck="false"
+            placeholder="输入 ICAO、IATA、机场或城市，如 ZBAA / PEK / Beijing"
+            aria-label="机场搜索关键词"
+          >
+          <button type="submit" :disabled="stationIndexLoading">搜索</button>
+        </form>
+
+        <p class="search-tip">
+          天气数据与机场索引来自 Aviation Weather Center；机场和城市名称使用官方英文名称。
+        </p>
+
+        <div v-if="stationIndexLoading" class="search-state">正在载入全球机场索引…</div>
+        <div v-else-if="stationIndexError" class="search-state search-state-error">
+          <span>{{ stationIndexError }}</span>
+          <button type="button" @click="retryStationIndex">重试</button>
+        </div>
+        <div v-else-if="!airportResults.length" class="search-state">
+          没有匹配结果，请尝试 ICAO、IATA 或英文城市名。
+        </div>
+        <div v-else class="airport-results" role="listbox" aria-label="机场搜索结果">
+          <button
+            v-for="airport in airportResults"
+            :key="airport.icaoId"
+            type="button"
+            class="airport-result"
+            :class="{ selected: airport.icaoId === icaoCode }"
+            role="option"
+            :aria-selected="airport.icaoId === icaoCode"
+            @click="selectAirport(airport)"
+          >
+            <span class="airport-code">{{ airport.icaoId }}</span>
+            <span class="airport-info">
+              <strong>{{ airport.site || 'Unnamed station' }}</strong>
+              <small>{{ airportLocation(airport) }}</small>
+            </span>
+            <span v-if="airport.iataId" class="iata-code">{{ airport.iataId }}</span>
+          </button>
+        </div>
+
+        <div class="search-footer">
+          <span>当前：{{ icaoCode }} · {{ stationName }}</span>
+          <a :href="detailURL" target="_blank" rel="noopener noreferrer">
+            在 METAR-TAF 查看详情 ↗
+          </a>
+        </div>
+      </div>
+    </easy-dialog>
   </div>
 </template>
 
 <script lang="ts" setup>
-import { computed, onUnmounted, ref, watch } from 'vue'
+import { computed, nextTick, onUnmounted, ref, watch } from 'vue'
 
 interface MetarReport {
   icaoId?: string
@@ -119,6 +188,18 @@ interface TafReport {
   rawTAF?: string
 }
 
+interface AirportStation {
+  id?: string
+  icaoId: string
+  iataId?: string | null
+  faaId?: string | null
+  site?: string
+  state?: string
+  country?: string
+  priority?: number
+  siteType?: string[]
+}
+
 const props = defineProps({
   componentSetting: {
     type: Object,
@@ -126,7 +207,12 @@ const props = defineProps({
   }
 })
 
-const API_BASE = 'https://aviationweather.gov/api/data'
+const API_BASE = import.meta.env.DEV
+  ? '/awc-api'
+  : 'https://aviationweather.gov/api/data'
+const STATION_INDEX_URL = import.meta.env.DEV
+  ? '/awc-cache/stations.cache.json'
+  : 'https://aviationweather.gov/data/cache/stations.cache.json'
 
 const icaoCode = computed(() => {
   const value = String(props.componentSetting.icaoCode || 'ZBAA').trim().toUpperCase()
@@ -138,10 +224,111 @@ const taf = ref<TafReport | null>(null)
 const loading = ref(true)
 const refreshing = ref(false)
 const errorMessage = ref('')
+const searchVisible = ref(false)
+const searchKeyword = ref('')
+const searchInput = ref<HTMLInputElement | null>(null)
+const stationIndex = ref<AirportStation[]>([])
+const stationIndexLoading = ref(false)
+const stationIndexError = ref('')
+const airportResults = ref<AirportStation[]>([])
 
 const hasData = computed(() => Boolean(metar.value || taf.value))
 const stationName = computed(() => metar.value?.name || taf.value?.name || '航空天气')
 const detailURL = computed(() => `https://metar-taf.com/en/${icaoCode.value}`)
+
+const searchableText = (airport: AirportStation) => [
+  airport.icaoId,
+  airport.iataId,
+  airport.faaId,
+  airport.site,
+  airport.state,
+  airport.country
+].filter(Boolean).join(' ').toUpperCase()
+
+const resultScore = (airport: AirportStation, keyword: string) => {
+  const icao = airport.icaoId.toUpperCase()
+  const iata = airport.iataId?.toUpperCase() || ''
+  const site = airport.site?.toUpperCase() || ''
+  if (icao === keyword) return 0
+  if (iata === keyword) return 1
+  if (icao.startsWith(keyword) || iata.startsWith(keyword)) return 2
+  if (site.startsWith(keyword)) return 3
+  if (site.includes(keyword)) return 4
+  return 5
+}
+
+const updateAirportResults = () => {
+  const keyword = searchKeyword.value.trim().toUpperCase()
+  if (!keyword || !stationIndex.value.length) {
+    airportResults.value = stationIndex.value
+      .filter(airport => airport.icaoId === icaoCode.value)
+      .slice(0, 1)
+    return
+  }
+
+  airportResults.value = stationIndex.value
+    .filter(airport => searchableText(airport).includes(keyword))
+    .sort((a, b) => {
+      const score = resultScore(a, keyword) - resultScore(b, keyword)
+      if (score) return score
+      return (a.priority ?? 99) - (b.priority ?? 99)
+    })
+    .slice(0, 40)
+}
+
+const loadStationIndex = async (force = false) => {
+  if (stationIndex.value.length && !force) return
+  stationIndexLoading.value = true
+  stationIndexError.value = ''
+  try {
+    const response = await fetch(STATION_INDEX_URL, {
+      cache: force ? 'reload' : 'force-cache'
+    })
+    if (!response.ok) throw new Error(`机场索引请求失败 (${response.status})`)
+    const stations = await response.json()
+    if (!Array.isArray(stations)) throw new Error('机场索引格式无效')
+    stationIndex.value = stations.filter((airport: AirportStation) => (
+      airport.icaoId && airport.siteType?.some(type => type === 'METAR' || type === 'TAF')
+    ))
+    updateAirportResults()
+  } catch (error) {
+    stationIndexError.value = error instanceof Error ? error.message : '无法载入机场索引'
+  } finally {
+    stationIndexLoading.value = false
+  }
+}
+
+const runAirportSearch = async () => {
+  await loadStationIndex()
+  updateAirportResults()
+}
+
+const openAirportSearch = async () => {
+  if (searchVisible.value) return
+  searchKeyword.value = icaoCode.value
+  searchVisible.value = true
+  await nextTick()
+  searchInput.value?.select()
+  await runAirportSearch()
+}
+
+const retryStationIndex = () => loadStationIndex(true)
+
+const selectAirport = (airport: AirportStation) => {
+  props.componentSetting.icaoCode = airport.icaoId
+  searchVisible.value = false
+}
+
+const airportLocation = (airport: AirportStation) => (
+  [airport.state, airport.country].filter(Boolean).join(' · ') || '位置未提供'
+)
+
+let searchTimer: number | null = null
+watch(searchKeyword, () => {
+  if (!searchVisible.value || !stationIndex.value.length) return
+  if (searchTimer) window.clearTimeout(searchTimer)
+  searchTimer = window.setTimeout(updateAirportResults, 120)
+})
 
 const windText = computed(() => {
   if (metar.value?.wspd == null) return ''
@@ -246,6 +433,7 @@ watch(
 onUnmounted(() => {
   controller?.abort()
   if (timer) window.clearInterval(timer)
+  if (searchTimer) window.clearTimeout(searchTimer)
 })
 </script>
 
@@ -259,6 +447,7 @@ onUnmounted(() => {
 }
 
 .weather-card {
+  position: relative;
   width: 100%;
   height: 100%;
   display: flex;
@@ -272,6 +461,22 @@ onUnmounted(() => {
   border: 1px solid rgba(255, 255, 255, 0.14);
   border-radius: inherit;
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+.weather-card-trigger {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  border-radius: inherit;
+  cursor: pointer;
+
+  &:focus-visible {
+    outline: 2px solid #7dd3fc;
+    outline-offset: -2px;
+  }
 }
 
 .weather-header,
@@ -305,14 +510,18 @@ footer {
   }
 }
 
-.detail-link,
+.choose-hint,
 .state-message a {
   flex: none;
   color: #7dd3fc;
-  text-decoration: none;
 }
 
-.detail-compact {
+.choose-hint {
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.choose-compact {
   display: none;
 }
 
@@ -414,6 +623,163 @@ footer {
   }
 }
 
+.state-message a,
+footer button {
+  position: relative;
+  z-index: 4;
+}
+
+.airport-search {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  box-sizing: border-box;
+  padding: 4px 4px 8px;
+  color: #1f2937;
+}
+
+.search-form {
+  display: flex;
+  gap: 8px;
+
+  input {
+    min-width: 0;
+    flex: 1;
+    padding: 10px 12px;
+    color: #111827;
+    background: #fff;
+    border: 1px solid #cbd5e1;
+    border-radius: 7px;
+    outline: none;
+
+    &:focus {
+      border-color: #0ea5e9;
+      box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.14);
+    }
+  }
+
+  button {
+    padding: 0 16px;
+    color: #fff;
+    background: #0284c7;
+    border: 0;
+    border-radius: 7px;
+    cursor: pointer;
+  }
+}
+
+.search-tip {
+  margin: 0;
+  color: #64748b;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.search-state {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  color: #64748b;
+  text-align: center;
+}
+
+.search-state-error {
+  color: #b91c1c;
+
+  button {
+    padding: 5px 10px;
+    color: #b91c1c;
+    background: #fff;
+    border: 1px solid #fecaca;
+    border-radius: 6px;
+    cursor: pointer;
+  }
+}
+
+.airport-results {
+  min-height: 0;
+  flex: 1;
+  overflow-y: auto;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+}
+
+.airport-result {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  color: #1f2937;
+  background: #fff;
+  border: 0;
+  border-bottom: 1px solid #f1f5f9;
+  cursor: pointer;
+  text-align: left;
+
+  &:last-child { border-bottom: 0; }
+  &:hover { background: #f0f9ff; }
+  &.selected { background: #e0f2fe; }
+}
+
+.airport-code {
+  flex: none;
+  width: 48px;
+  color: #0369a1;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+.airport-info {
+  min-width: 0;
+  flex: 1;
+
+  strong,
+  small {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  strong { font-size: 14px; }
+  small { margin-top: 2px; color: #64748b; font-size: 11px; }
+}
+
+.iata-code {
+  flex: none;
+  padding: 3px 6px;
+  color: #475569;
+  background: #f1f5f9;
+  border-radius: 5px;
+  font-size: 11px;
+}
+
+.search-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  color: #64748b;
+  font-size: 11px;
+
+  span {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  a {
+    flex: none;
+    color: #0284c7;
+    text-decoration: none;
+  }
+}
+
 @container (max-height: 140px) {
   .weather-card {
     gap: 6px;
@@ -425,7 +791,7 @@ footer {
     font-size: 18px;
   }
 
-  .detail-link {
+  .choose-hint {
     font-size: 11px;
   }
 
@@ -460,14 +826,14 @@ footer {
 
 @container (max-width: 220px) {
   .station span,
-  .detail-full,
+  .choose-full,
   .summary-dewpoint,
   .summary-visibility,
   .summary-qnh {
     display: none;
   }
 
-  .detail-compact {
+  .choose-compact {
     display: inline;
   }
 }
@@ -490,11 +856,50 @@ footer {
 
 @container (max-height: 64px) {
   .weather-card {
-    justify-content: center;
+    flex-direction: row;
+    align-items: center;
+    gap: 7px;
+    padding-block: 6px;
+  }
+
+  .weather-header {
+    min-width: 0;
+    flex: 1;
+  }
+
+  .station strong { font-size: 16px; }
+
+  .station span,
+  .choose-hint,
+  .summary-wind,
+  .summary-dewpoint,
+  .summary-visibility,
+  .summary-qnh {
+    display: none;
   }
 
   .weather-summary {
-    display: none;
+    flex: none;
+    flex-wrap: nowrap;
+    gap: 4px;
+
+    > span {
+      min-width: 0;
+      padding: 4px 6px;
+      font-size: 11px;
+    }
+  }
+
+  .state-message {
+    min-width: 0;
+    align-items: flex-end;
+    font-size: 10px;
+
+    strong,
+    span,
+    a {
+      display: none;
+    }
   }
 }
 </style>
