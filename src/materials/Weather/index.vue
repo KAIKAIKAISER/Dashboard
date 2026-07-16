@@ -2,7 +2,11 @@
   <div
     class="wrapper material-weather"
     :style="{
-      padding: componentSetting.padding + 'px'
+      padding: componentSetting.padding + 'px',
+      fontSize: (componentSetting.baseFontSize || 16) + 'px',
+      color: componentSetting.textColor || '#fff',
+      textShadow: componentSetting.textShadow || '0 0 1px #464646',
+      fontFamily: componentSetting.fontFamily || undefined
     }"
   >
     <section class="weather-card">
@@ -17,18 +21,6 @@
         @mouseup.stop
         @click.stop="openAirportSearch"
       />
-      <header class="weather-header">
-        <div class="station">
-          <strong>{{ icaoCode }}</strong>
-          <span>{{ stationName }}</span>
-        </div>
-        <span class="choose-hint">
-          <span class="choose-full">点击选择机场</span>
-          <span class="choose-compact">切换</span>
-          ⌄
-        </span>
-      </header>
-
       <div v-if="loading && !hasData" class="state-message">
         正在获取航空天气…
       </div>
@@ -42,29 +34,42 @@
       </div>
 
       <template v-else>
-        <div class="weather-summary">
-          <span
-            v-if="metar?.fltCat"
-            class="flight-category"
-            :data-category="metar.fltCat"
-          >
-            {{ metar.fltCat }}
-          </span>
-          <span v-if="metar?.temp != null" class="summary-temp">
-            <small>温度</small>{{ formatNumber(metar.temp) }}°C
-          </span>
-          <span v-if="metar?.dewp != null" class="summary-dewpoint">
-            <small>露点</small>{{ formatNumber(metar.dewp) }}°C
-          </span>
-          <span v-if="windText" class="summary-wind">
-            <small>风</small>{{ windText }}
-          </span>
-          <span v-if="metar?.visib" class="summary-visibility">
-            <small>能见度</small>{{ metar.visib }} SM
-          </span>
-          <span v-if="metar?.altim != null" class="summary-qnh">
-            <small>QNH</small>{{ formatNumber(metar.altim) }} hPa
-          </span>
+        <div class="weather-overview">
+          <div class="weather-icon-wrapper">
+            <img
+              :src="weatherIcon"
+              :alt="weatherCondition"
+              :style="{
+                filter: `drop-shadow(${componentSetting.iconShadow || '0 0 1px #464646'})`
+              }"
+            >
+          </div>
+          <div class="weather-primary">
+            <div class="temperature">
+              {{ temperatureText }}°
+            </div>
+            <div class="condition">
+              {{ weatherCondition }}
+            </div>
+          </div>
+          <div class="weather-essentials">
+            <span>
+              <small>湿度</small>
+              <strong>{{ humidityText }}</strong>
+            </span>
+            <span>
+              <small>降水</small>
+              <strong>{{ precipitationText }}</strong>
+            </span>
+          </div>
+          <span class="select-cue" aria-hidden="true">⌄</span>
+        </div>
+
+        <div class="weather-stats">
+          <span v-if="windText"><small>风</small>{{ windText }}</span>
+          <span v-if="metar?.visib"><small>能见度</small>{{ metar.visib }} SM</span>
+          <span v-if="metar?.altim != null"><small>气压</small>{{ formatNumber(metar.altim) }} hPa</span>
+          <span v-if="metar?.dewp != null"><small>露点</small>{{ formatNumber(metar.dewp) }}°C</span>
         </div>
 
         <div class="reports">
@@ -165,6 +170,7 @@
 
 <script lang="ts" setup>
 import { computed, nextTick, onUnmounted, ref, watch } from 'vue'
+import { getWeatherIconURL } from './icon-map'
 
 interface MetarReport {
   icaoId?: string
@@ -178,6 +184,12 @@ interface MetarReport {
   visib?: string
   altim?: number
   fltCat?: string
+  cover?: string
+  wxString?: string
+  precip?: number
+  pcp3hr?: number
+  pcp6hr?: number
+  pcp24hr?: number
   rawOb?: string
 }
 
@@ -235,6 +247,65 @@ const airportResults = ref<AirportStation[]>([])
 const hasData = computed(() => Boolean(metar.value || taf.value))
 const stationName = computed(() => metar.value?.name || taf.value?.name || '航空天气')
 const detailURL = computed(() => `https://metar-taf.com/en/${icaoCode.value}`)
+
+const weatherCondition = computed(() => {
+  const weather = (metar.value?.wxString || '').toUpperCase()
+  if (weather.includes('TS')) return '雷阵雨'
+  if (weather.includes('FZRA') || weather.includes('PL')) return '雨夹雪'
+  if (weather.includes('SN') || weather.includes('SG')) return '雪'
+  if (weather.includes('RA') || weather.includes('DZ')) {
+    if (weather.includes('+')) return '大雨'
+    return '小雨'
+  }
+  if (weather.includes('FG')) return '大雾'
+  if (weather.includes('BR') || weather.includes('HZ') || weather.includes('FU')) return '小雾'
+  if (weather.includes('FC') || weather.includes('SQ')) return '风'
+
+  const cover = (metar.value?.cover || '').toUpperCase()
+  if (cover === 'OVC') return '阴'
+  if (cover === 'BKN') return '多云'
+  if (cover === 'SCT') return '晴间多云'
+  if (cover === 'FEW') return '少云'
+  if (['CLR', 'SKC', 'CAVOK', 'NSC', 'NCD'].includes(cover)) return '晴'
+  return '未知'
+})
+
+const weatherIcon = computed(() => getWeatherIconURL(
+  weatherCondition.value,
+  props.componentSetting.animationIcon !== false
+))
+
+const temperatureText = computed(() => (
+  metar.value?.temp == null ? '--' : formatNumber(metar.value.temp)
+))
+
+const humidity = computed(() => {
+  if (metar.value?.temp == null || metar.value.dewp == null) return null
+  const temperature = metar.value.temp
+  const dewPoint = metar.value.dewp
+  const relativeHumidity = 100 * Math.exp(
+    (17.625 * dewPoint) / (243.04 + dewPoint)
+    - (17.625 * temperature) / (243.04 + temperature)
+  )
+  return Math.round(Math.min(100, Math.max(0, relativeHumidity)))
+})
+
+const humidityText = computed(() => humidity.value == null ? '--' : `${humidity.value}%`)
+
+const precipitationText = computed(() => {
+  const weather = (metar.value?.wxString || '').toUpperCase()
+  if (weather.includes('TS')) return '雷雨'
+  if (weather.includes('FZRA') || weather.includes('PL')) return '冻雨'
+  if (weather.includes('SN') || weather.includes('SG')) return '降雪'
+  if (weather.includes('RA') || weather.includes('DZ')) return weather.includes('+') ? '大雨' : '有雨'
+
+  const precipitation = metar.value?.precip
+  if (precipitation != null && precipitation > 0) {
+    const millimeters = precipitation * 25.4
+    return `${millimeters < 0.1 ? '<0.1' : millimeters.toFixed(1)} mm`
+  }
+  return '无'
+})
 
 const searchableText = (airport: AirportStation) => [
   airport.icaoId,
@@ -452,15 +523,15 @@ onUnmounted(() => {
   height: 100%;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 10px;
   box-sizing: border-box;
-  padding: 14px;
+  padding: 10px;
   overflow: auto;
-  color: #f7f9fc;
-  background: linear-gradient(145deg, rgba(15, 23, 42, 0.88), rgba(30, 41, 59, 0.72));
-  border: 1px solid rgba(255, 255, 255, 0.14);
+  color: inherit;
+  background: transparent;
+  border: 0;
   border-radius: inherit;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  box-shadow: none;
 }
 
 .weather-card-trigger {
@@ -476,6 +547,104 @@ onUnmounted(() => {
   &:focus-visible {
     outline: 2px solid #7dd3fc;
     outline-offset: -2px;
+  }
+}
+
+.weather-overview {
+  min-height: 56px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  overflow: hidden;
+}
+
+.weather-icon-wrapper {
+  width: 58px;
+  height: 58px;
+  flex: none;
+  display: grid;
+  place-items: center;
+
+  img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+  }
+}
+
+.weather-primary {
+  min-width: 52px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.temperature {
+  font-size: 2.35em;
+  font-weight: 500;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.condition {
+  max-width: 96px;
+  margin-top: 3px;
+  overflow: hidden;
+  font-size: 0.76em;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.weather-essentials {
+  min-width: 68px;
+  display: grid;
+  gap: 5px;
+  margin-left: auto;
+
+  > span {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 6px;
+    white-space: nowrap;
+  }
+
+  small {
+    color: rgba(255, 255, 255, 0.68);
+    font-size: 0.68em;
+    font-weight: 400;
+  }
+
+  strong {
+    font-size: 0.78em;
+    font-weight: 600;
+  }
+}
+
+.select-cue {
+  flex: none;
+  color: rgba(255, 255, 255, 0.56);
+  font-size: 11px;
+}
+
+.weather-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+
+  > span {
+    padding: 6px 8px;
+    background: rgba(15, 23, 42, 0.32);
+    border-radius: 7px;
+    font-size: 0.76em;
+    white-space: nowrap;
+  }
+
+  small {
+    margin-right: 5px;
+    color: rgba(255, 255, 255, 0.58);
+    font-weight: 400;
   }
 }
 
@@ -787,37 +956,12 @@ footer button {
     overflow: hidden;
   }
 
-  .station strong {
-    font-size: 18px;
+  .weather-overview {
+    min-height: 0;
+    flex: 1;
   }
 
-  .choose-hint {
-    font-size: 11px;
-  }
-
-  .weather-summary {
-    flex-wrap: nowrap;
-    gap: 5px;
-    overflow: hidden;
-
-    > span {
-      min-width: 0;
-      flex: none;
-      padding: 5px 7px;
-      font-size: 12px;
-      white-space: nowrap;
-    }
-
-    small {
-      display: none;
-    }
-  }
-
-  .weather-summary .flight-category {
-    min-width: 34px;
-    padding-inline: 6px;
-  }
-
+  .weather-stats,
   .reports,
   footer {
     display: none;
@@ -825,74 +969,78 @@ footer button {
 }
 
 @container (max-width: 220px) {
-  .station span,
-  .choose-full,
-  .summary-dewpoint,
-  .summary-visibility,
-  .summary-qnh {
-    display: none;
+  .weather-card {
+    padding: 4px 6px;
   }
 
-  .choose-compact {
-    display: inline;
+  .weather-overview {
+    gap: 4px;
+  }
+
+  .weather-icon-wrapper {
+    width: 38px;
+    height: 38px;
+  }
+
+  .weather-primary {
+    min-width: 42px;
+  }
+
+  .temperature {
+    font-size: 1.7em;
+  }
+
+  .condition {
+    max-width: 48px;
+    margin-top: 1px;
+    font-size: 0.62em;
+  }
+
+  .weather-essentials {
+    min-width: 54px;
+    gap: 2px;
+
+    > span { gap: 3px; }
+    small { font-size: 0.6em; }
+    strong { font-size: 0.69em; }
+  }
+
+  .select-cue {
+    display: none;
   }
 }
 
 @container (max-width: 155px) {
   .weather-card {
-    padding-inline: 7px;
+    padding-inline: 4px;
   }
 
-  .weather-header {
-    gap: 6px;
+  .weather-icon-wrapper {
+    width: 34px;
+    height: 34px;
   }
 
-  .summary-wind {
-    max-width: 58px;
-    overflow: hidden;
-    text-overflow: ellipsis;
+  .weather-primary {
+    min-width: 38px;
+  }
+
+  .weather-essentials {
+    min-width: 50px;
   }
 }
 
 @container (max-height: 64px) {
   .weather-card {
-    flex-direction: row;
-    align-items: center;
-    gap: 7px;
-    padding-block: 6px;
+    padding-block: 3px;
   }
 
-  .weather-header {
-    min-width: 0;
-    flex: 1;
-  }
-
-  .station strong { font-size: 16px; }
-
-  .station span,
-  .choose-hint,
-  .summary-wind,
-  .summary-dewpoint,
-  .summary-visibility,
-  .summary-qnh {
-    display: none;
-  }
-
-  .weather-summary {
-    flex: none;
-    flex-wrap: nowrap;
-    gap: 4px;
-
-    > span {
-      min-width: 0;
-      padding: 4px 6px;
-      font-size: 11px;
-    }
+  .weather-icon-wrapper {
+    width: 32px;
+    height: 32px;
   }
 
   .state-message {
-    min-width: 0;
-    align-items: flex-end;
+    align-items: center;
     font-size: 10px;
 
     strong,

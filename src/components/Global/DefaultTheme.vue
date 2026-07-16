@@ -82,14 +82,14 @@ import Mobile from '@/components/Global/DefaultThemeData/Mobile.json'
 import MobilePro from '@/components/Global/DefaultThemeData/MobilePro.json'
 import MovieLines from '@/components/Global/DefaultThemeData/MovieLines.json'
 import Tabs from '@/components/Global/DefaultThemeData/Tabs.json'
-// import BaseImg from '@/assets/imgs/theme/base.png'
-// import SimpleImg from '@/assets/imgs/theme/simple.png'
-// import MultipleImg from '@/assets/imgs/theme/multi.png'
-// import ModuleImg from '@/assets/imgs/theme/module.png'
-// import MovieLinesImg from '@/assets/imgs/theme/movie-lines.png'
-// import MobileImg from '@/assets/imgs/theme/mobile.png'
-// import MobileProImg from '@/assets/imgs/theme/mobile-pro.png'
-// import TabsImg from '@/assets/imgs/theme/tabs.gif'
+import BaseImg from '@/assets/imgs/theme/base.png'
+import SimpleImg from '@/assets/imgs/theme/simple.png'
+import MultipleImg from '@/assets/imgs/theme/multi.png'
+import ModuleImg from '@/assets/imgs/theme/module.png'
+import MovieLinesImg from '@/assets/imgs/theme/movie-lines.png'
+import MobileImg from '@/assets/imgs/theme/mobile.png'
+import MobileProImg from '@/assets/imgs/theme/mobile-pro.png'
+import TabsImg from '@/assets/imgs/theme/tabs.gif'
 import { loadHarmonyOSFont } from '@/utils'
 import { langList } from '@/lang'
 import { useI18n } from 'vue-i18n'
@@ -119,37 +119,37 @@ export default defineComponent({
       {
         label: 'Simple',
         json: Simple,
-        img: 'https://cdn.kongfandong.cn/img/howdz-theme/simple.png',
+        img: SimpleImg,
         desc: '简约'
       },
       {
         label: 'Basic',
         json: Base,
-        img: 'https://cdn.kongfandong.cn/img/howdz-theme/base.png',
+        img: BaseImg,
         desc: '基础 x 动态壁纸'
       },
       {
         label: 'Multiple',
         json: Multiple,
-        img: 'https://cdn.kongfandong.cn/img/howdz-theme/multi.png',
+        img: MultipleImg,
         desc: '多组件预设'
       },
       {
         label: 'TabPages',
         json: Tabs,
-        img: 'https://cdn.kongfandong.cn/img/howdz-theme/tabs.gif',
+        img: TabsImg,
         desc: '标签页预设'
       },
       {
         label: 'MovieLine',
         json: MovieLines,
-        img: 'https://cdn.kongfandong.cn/img/howdz-theme/movie-lines.png',
+        img: MovieLinesImg,
         desc: '电影壁纸预设'
       },
       {
         label: 'Module',
         json: Module,
-        img: 'https://cdn.kongfandong.cn/img/howdz-theme/module.png',
+        img: ModuleImg,
         desc: '模块组件预设'
       }
     ]
@@ -159,13 +159,13 @@ export default defineComponent({
       {
         label: 'Mobile',
         json: Mobile,
-        img: 'https://cdn.kongfandong.cn/img/howdz-theme/mobile.png',
+        img: MobileImg,
         desc: '手机端预设#1'
       },
       {
         label: 'Mobile MovieLine',
         json: MobilePro,
-        img: 'https://cdn.kongfandong.cn/img/howdz-theme/mobile-pro.png',
+        img: MobileProImg,
         desc: '手机端预设#2'
       }
     ]
