@@ -2,7 +2,7 @@ import { createApp } from 'vue'
 import VueGridLayout from 'vue-grid-layout'
 import { i18n } from '@/lang'
 import App from './App.vue'
-import store from './store'
+import store, { useStore } from './store'
 import '@/assets/element-modules.scss'
 import '@/assets/global.scss'
 import {
@@ -28,6 +28,7 @@ import {
 import EasyDialog from '@/components/Global/EasyDialog.vue'
 import Icon from '@/components/Tools/Icon.vue'
 import { setPreviewModeData } from '@/utils/preview-mode'
+import { migrateLegacyThemeAssets } from '@/utils/theme-assets'
 
 if (import.meta.env.PROD) {
   // 强制重定向到https
@@ -74,6 +75,9 @@ const init = async () => {
       }
     }
   }
+
+  // Replace retired preset CDN assets in both existing installs and preview imports.
+  migrateLegacyThemeAssets(useStore())
 
   // Mount app
   const components = [

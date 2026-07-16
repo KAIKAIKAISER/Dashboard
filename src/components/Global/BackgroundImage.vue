@@ -39,7 +39,7 @@
       />
     </div>
     <div
-      v-else-if="realBackgroundURL"
+      v-else-if="realBackgroundURL && !imageLoadFailed"
       :class="['bg-media-wrapper', showBackgroundEffect && 'system-bg-effect']"
     >
       <div class="bg-media-filter" :style="`width:100%;height:100%;filter:${filter}`">
@@ -78,6 +78,10 @@
         </div>
       </div>
     </div>
+    <div
+      v-else-if="backgroundURL && imageLoadFailed"
+      :class="['bg-media-wrapper', 'image-fallback', showBackgroundEffect && 'system-bg-effect']"
+    />
   </div>
 </template>
 
@@ -151,7 +155,11 @@ const imgCrossorigin = computed(() => {
 
 watch(
   () => backgroundURL.value,
-  () => updateBackground()
+  () => {
+    imageLoadFailed.value = false
+    loadFirstError = false
+    updateBackground()
+  }
 )
 let directToUnsplash = false // 是否直连到Unsplash获取随机图
 const updateBackground = async () => {
@@ -301,13 +309,18 @@ const handleImgLoad = async () => {
 }
 
 let loadFirstError = false
+const imageLoadFailed = ref(false)
 const hanleImgError = async () => {
-  if (loadFirstError) return
-  if (isSupportIndexDB) {
+  if (!loadFirstError && isSupportIndexDB) {
     const localCacheImg = await cacheBackgroundImg.getItem('img')
-    store.updateState({ key: 'realBackgroundURL', value: localCacheImg })
+    if (localCacheImg && localCacheImg !== realBackgroundURL.value) {
+      loadFirstError = true
+      store.updateState({ key: 'realBackgroundURL', value: localCacheImg })
+      return
+    }
   }
   loadFirstError = true
+  imageLoadFailed.value = true
 }
 
 const handleVideoError = () => {
@@ -371,6 +384,8 @@ defineExpose({
   height: 100%;
   font-size: 0;
   overflow: hidden;
+  background-size: 130% 130% !important;
+  animation: fallback-breathe 18s ease-in-out infinite alternate;
   .bg-media-wrapper {
     width: 100%;
     height: 100%;
@@ -395,10 +410,19 @@ defineExpose({
   height: 100%;
   object-fit: cover;
 }
-.video-fallback {
+.video-fallback,
+.image-fallback {
   background:
-    radial-gradient(circle at 20% 20%, rgba(58, 83, 155, 0.38), transparent 42%),
-    linear-gradient(145deg, #1d2233, #111827);
+    radial-gradient(circle at 18% 18%, rgba(89, 132, 190, 0.82), transparent 38%),
+    radial-gradient(circle at 82% 78%, rgba(31, 78, 121, 0.7), transparent 42%),
+    linear-gradient(145deg, #263b55, #172238 50%, #0f1728);
+  background-size: 130% 130%;
+  animation: fallback-breathe 18s ease-in-out infinite alternate;
+}
+
+@keyframes fallback-breathe {
+  from { background-position: 0% 0%; }
+  to { background-position: 100% 100%; }
 }
 .bg-placeholder {
   width: 100%;
