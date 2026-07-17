@@ -48,6 +48,7 @@
           class="global-bg-img"
           :crossorigin="imgCrossorigin"
           :src="realBackgroundURL"
+          referrerpolicy="no-referrer"
           style="width: 100%; height: 100%; object-fit: cover; opacity: 0"
           @load="handleImgLoad"
           @error="hanleImgError"
