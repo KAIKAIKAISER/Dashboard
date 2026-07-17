@@ -48,8 +48,10 @@
             <div class="temperature">
               {{ temperatureText }}°
             </div>
-            <div class="condition">
-              {{ weatherCondition }}
+            <div class="weather-location" :title="`${cityLabel} · ${weatherCondition}`">
+              <span class="city">{{ cityLabel }}</span>
+              <span class="location-separator" aria-hidden="true">·</span>
+              <span class="condition">{{ weatherCondition }}</span>
             </div>
           </div>
           <div class="weather-essentials">
@@ -247,6 +249,55 @@ const airportResults = ref<AirportStation[]>([])
 const hasData = computed(() => Boolean(metar.value || taf.value))
 const stationName = computed(() => metar.value?.name || taf.value?.name || '航空天气')
 const detailURL = computed(() => `https://metar-taf.com/en/${icaoCode.value}`)
+
+const CHINESE_CITY_NAMES: Record<string, string> = {
+  ZBAA: '北京',
+  ZBAD: '北京',
+  ZSPD: '上海',
+  ZSSS: '上海',
+  ZGGG: '广州',
+  ZGSZ: '深圳',
+  ZUUU: '成都',
+  ZUTF: '成都',
+  ZUCK: '重庆',
+  ZPPP: '昆明',
+  ZSHC: '杭州',
+  ZSNJ: '南京',
+  ZSAM: '厦门',
+  ZSFZ: '福州',
+  ZSQD: '青岛',
+  ZYTL: '大连',
+  ZYTX: '沈阳',
+  ZYHB: '哈尔滨',
+  ZYCC: '长春',
+  ZHCC: '郑州',
+  ZHHH: '武汉',
+  ZGHA: '长沙',
+  ZSCN: '南昌',
+  ZSOF: '合肥',
+  ZLXY: '西安',
+  ZLLL: '兰州',
+  ZLXN: '西宁',
+  ZBHH: '呼和浩特',
+  ZBTJ: '天津',
+  ZWWW: '乌鲁木齐',
+  ZUGY: '贵阳',
+  ZULS: '拉萨',
+  ZJHK: '海口',
+  ZJSY: '三亚'
+}
+
+const extractCityName = (name: string) => {
+  const firstPart = name
+    .replace(/\b(international|intl|airport|aerodrome|air base|apt)\b.*$/i, '')
+    .split(/[/,—-]/)[0]
+    .trim()
+  return firstPart || icaoCode.value
+}
+
+const cityLabel = computed(() => (
+  CHINESE_CITY_NAMES[icaoCode.value] || extractCityName(stationName.value)
+))
 
 const weatherCondition = computed(() => {
   const weather = (metar.value?.wxString || '').toUpperCase()
@@ -573,7 +624,8 @@ onUnmounted(() => {
 }
 
 .weather-primary {
-  min-width: 52px;
+  min-width: 0;
+  flex: 1;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -587,38 +639,70 @@ onUnmounted(() => {
   white-space: nowrap;
 }
 
-.condition {
-  max-width: 96px;
+.weather-location {
+  width: 100%;
+  min-width: 0;
   margin-top: 3px;
-  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
   font-size: 0.76em;
-  text-overflow: ellipsis;
+  font-weight: 600;
+  line-height: 1.2;
   white-space: nowrap;
 }
 
+.city,
+.condition {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.city {
+  flex: none;
+  max-width: 48%;
+}
+
+.condition {
+  flex: 0 1 auto;
+}
+
+.location-separator {
+  flex: none;
+  color: rgba(255, 255, 255, 0.58);
+  font-weight: 400;
+}
+
 .weather-essentials {
-  min-width: 68px;
+  min-width: 66px;
   display: grid;
-  gap: 5px;
+  gap: 4px;
   margin-left: auto;
+  padding-left: 8px;
+  border-left: 1px solid rgba(255, 255, 255, 0.22);
 
   > span {
-    display: flex;
-    align-items: baseline;
-    justify-content: space-between;
+    display: grid;
+    grid-template-columns: auto 1fr;
+    align-items: center;
     gap: 6px;
     white-space: nowrap;
   }
 
   small {
     color: rgba(255, 255, 255, 0.68);
-    font-size: 0.68em;
-    font-weight: 400;
+    font-size: 0.74em;
+    font-weight: 500;
   }
 
   strong {
-    font-size: 0.78em;
-    font-weight: 600;
+    overflow: hidden;
+    font-size: 0.76em;
+    font-weight: 700;
+    text-align: right;
+    text-overflow: ellipsis;
   }
 }
 
@@ -978,31 +1062,32 @@ footer button {
   }
 
   .weather-icon-wrapper {
-    width: 38px;
-    height: 38px;
+    width: 34px;
+    height: 34px;
   }
 
   .weather-primary {
-    min-width: 42px;
+    min-width: 0;
   }
 
   .temperature {
-    font-size: 1.7em;
+    font-size: 1.75em;
   }
 
-  .condition {
-    max-width: 48px;
+  .weather-location {
     margin-top: 1px;
-    font-size: 0.62em;
+    gap: 2px;
+    font-size: 0.66em;
   }
 
   .weather-essentials {
-    min-width: 54px;
-    gap: 2px;
+    min-width: 50px;
+    gap: 3px;
+    padding-left: 5px;
 
-    > span { gap: 3px; }
-    small { font-size: 0.6em; }
-    strong { font-size: 0.69em; }
+    > span { gap: 4px; }
+    small,
+    strong { font-size: 0.66em; }
   }
 
   .select-cue {
@@ -1021,11 +1106,11 @@ footer button {
   }
 
   .weather-primary {
-    min-width: 38px;
+    min-width: 0;
   }
 
   .weather-essentials {
-    min-width: 50px;
+    min-width: 48px;
   }
 }
 
@@ -1034,9 +1119,32 @@ footer button {
     padding-block: 3px;
   }
 
+  .weather-overview {
+    gap: 2px;
+  }
+
   .weather-icon-wrapper {
-    width: 32px;
-    height: 32px;
+    width: 28px;
+    height: 28px;
+  }
+
+  .temperature {
+    font-size: 1.65em;
+  }
+
+  .weather-location {
+    font-size: 0.6em;
+  }
+
+  .weather-essentials {
+    width: 50px;
+    min-width: 50px;
+    box-sizing: border-box;
+    padding-left: 4px;
+
+    > span { gap: 3px; }
+    small,
+    strong { font-size: 0.6em; }
   }
 
   .state-message {
