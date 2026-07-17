@@ -130,8 +130,8 @@
         "x": 13,
         "y": 9
       },
-      "w": 197,
-      "h": 95,
+      "w": 300,
+      "h": 105,
       "background": "transparent",
       "backgroundFilter": "brightness(0.9)",
       "material": "Weather",
