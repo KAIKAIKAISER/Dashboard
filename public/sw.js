@@ -33,7 +33,7 @@ workbox.routing.registerRoute(
 
 // Cache image.
 workbox.routing.registerRoute(
-  ({ request }) => request.destination === 'image',
+  ({ request, url }) => url.origin === self.location.origin && request.destination === 'image',
   new workbox.strategies.StaleWhileRevalidate({
     cacheName: 'image',
     plugins: [
@@ -50,7 +50,7 @@ workbox.routing.registerRoute(
 
 // Cache video
 workbox.routing.registerRoute(
-  ({ request }) => request.destination === 'video',
+  ({ request, url }) => url.origin === self.location.origin && request.destination === 'video',
   new workbox.strategies.CacheFirst({
     cacheName: 'video',
     plugins: [

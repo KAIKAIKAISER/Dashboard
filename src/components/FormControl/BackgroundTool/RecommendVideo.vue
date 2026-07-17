@@ -18,7 +18,13 @@
       <div class="video-wrapper">
         <div v-for="item in basicVideoList" :key="item.img" class="video" @click="handleSelect(item, 'static')">
           <div class="img-wrapper">
-            <img v-if="item.img" :src="item.img" loading="lazy">
+            <img
+              v-if="item.img"
+              :src="item.img"
+              loading="lazy"
+              referrerpolicy="no-referrer"
+              @error="handleThumbnailError"
+            >
           </div>
         </div>
         <div v-for="item in 4" :key="item" class="video-fake" />
@@ -30,7 +36,13 @@
       <div class="video-wrapper">
         <div v-for="item in pixabayVideoList" :key="item.img" class="video" @click="handleSelect(item, 'pixabay')">
           <div class="img-wrapper">
-            <img v-if="item.img" :src="item.img" loading="lazy">
+            <img
+              v-if="item.img"
+              :src="item.img"
+              loading="lazy"
+              referrerpolicy="no-referrer"
+              @error="handleThumbnailError"
+            >
           </div>
         </div>
         <div v-for="item in 4" :key="item" class="video-fake" />
@@ -49,6 +61,7 @@ import { ref } from 'vue'
 import { ElNotification } from 'element-plus'
 import { useI18n } from 'vue-i18n';
 import request from '@/utils/request'
+import videoThumbnailFallback from '@/assets/imgs/video-thumb.png'
 
 const { t } = useI18n()
 const emit = defineEmits(['submit'])
@@ -59,6 +72,13 @@ const loading = ref(false)
 
 const basicVideoList = ref<any[]>([])
 const pixabayVideoList = ref<any[]>([])
+
+const handleThumbnailError = (event: Event) => {
+  const img = event.currentTarget as HTMLImageElement
+  if (img.dataset.fallbackApplied) return
+  img.dataset.fallbackApplied = 'true'
+  img.src = videoThumbnailFallback
+}
 
 const getList = async () => {
   const staticVideosRes = await request({ url: `/staticVideos?type=all`})
