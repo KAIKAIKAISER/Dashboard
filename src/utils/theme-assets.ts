@@ -34,6 +34,13 @@ const presetThemes: any[] = [
 const defaultRecoveredBackground =
   '#242428 url(https://kongfandong.cn/api/randomPhoto/bing?duration=120) center center / cover'
 
+const isLegacyCompactWeather = (item: Record<string, any>) => (
+  window.innerWidth >= 500
+  && item.material === 'Weather'
+  && item.position === 2
+  && (Number(item.w) < 300 || Number(item.h) < 105)
+)
+
 const isObject = (value: unknown): value is Record<string, any> =>
   !!value && typeof value === 'object' && !Array.isArray(value)
 
@@ -172,6 +179,14 @@ const repairPresetItems = <T>(input: T): NormalizedResult<T> => {
 
   let current: Record<string, any> = input
   let changed = false
+  if (isLegacyCompactWeather(current)) {
+    current = {
+      ...current,
+      w: Math.max(Number(current.w) || 0, 300),
+      h: Math.max(Number(current.h) || 0, 105)
+    }
+    changed = true
+  }
   if (typeof current.i === 'string') {
     const candidates = presetItemsById.get(current.i) || []
     const bestTemplate = candidates.reduce<{ template?: Record<string, any>; count: number }>(

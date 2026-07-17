@@ -676,24 +676,27 @@ onUnmounted(() => {
 }
 
 .weather-essentials {
-  min-width: 66px;
+  width: 84px;
+  min-width: 84px;
+  box-sizing: border-box;
   display: grid;
-  gap: 4px;
+  gap: 6px;
   margin-left: auto;
-  padding-left: 8px;
+  padding-left: 10px;
   border-left: 1px solid rgba(255, 255, 255, 0.22);
 
   > span {
     display: grid;
-    grid-template-columns: auto 1fr;
+    grid-template-columns: 2.4em minmax(0, 1fr);
     align-items: center;
     gap: 6px;
+    line-height: 1.25;
     white-space: nowrap;
   }
 
   small {
     color: rgba(255, 255, 255, 0.68);
-    font-size: 0.74em;
+    font-size: 0.76em;
     font-weight: 500;
   }
 
@@ -707,9 +710,7 @@ onUnmounted(() => {
 }
 
 .select-cue {
-  flex: none;
-  color: rgba(255, 255, 255, 0.56);
-  font-size: 11px;
+  display: none;
 }
 
 .weather-stats {

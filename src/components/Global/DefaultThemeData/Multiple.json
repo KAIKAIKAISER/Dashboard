@@ -200,8 +200,8 @@
         "x": 10,
         "y": 10
       },
-      "w": 180,
-      "h": 80,
+      "w": 300,
+      "h": 105,
       "background": "transparent",
       "backgroundFilter": "brightness(0.9)",
       "material": "Weather",
