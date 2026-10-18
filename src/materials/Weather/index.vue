@@ -79,22 +79,24 @@
             <div class="report-title">
               <strong>METAR</strong>
               <time v-if="metarTime">{{ metarTime }}</time>
+              <small v-else-if="isFallback" style="color: rgba(255, 255, 255, 0.45)">回退模式</small>
             </div>
-            <p>{{ metar?.rawOb || '暂无 METAR' }}</p>
+            <p>{{ metar?.rawOb || (isFallback ? `${icaoCode} 暂无国际公开 METAR 报文` : '暂无 METAR') }}</p>
           </article>
 
           <article class="report">
             <div class="report-title">
               <strong>TAF</strong>
               <time v-if="tafTime">{{ tafTime }}</time>
+              <small v-else-if="isFallback" style="color: rgba(255, 255, 255, 0.45)">城市天气</small>
             </div>
-            <p>{{ taf?.rawTAF || '暂无 TAF' }}</p>
+            <p>{{ taf?.rawTAF || (isFallback ? `已自动回退至 ${cityLabel} 城市天气：${weatherCondition} ${temperatureText}°C` : '暂无 TAF') }}</p>
           </article>
         </div>
 
         <footer>
           <span>
-            数据：Aviation Weather Center
+            数据：{{ isFallback ? '高德天气 (回退模式)' : 'Aviation Weather Center' }}
             <template v-if="refreshing"> · 更新中…</template>
             <template v-else-if="errorMessage"> · 部分数据更新失败</template>
           </span>
@@ -152,7 +154,7 @@
           >
             <span class="airport-code">{{ airport.icaoId }}</span>
             <span class="airport-info">
-              <strong>{{ airport.site || 'Unnamed station' }}</strong>
+              <strong>{{ airportDisplayName(airport) }}</strong>
               <small>{{ airportLocation(airport) }}</small>
             </span>
             <span v-if="airport.iataId" class="iata-code">{{ airport.iataId }}</span>
@@ -172,7 +174,8 @@
 
 <script lang="ts" setup>
 import { computed, nextTick, onUnmounted, ref, watch } from 'vue'
-import { getWeatherIconURL } from './icon-map'
+import { getWeatherIconURL, weatherFormatter } from './icon-map'
+import request from '@/utils/request'
 
 interface MetarReport {
   icaoId?: string
@@ -214,6 +217,12 @@ interface AirportStation {
   siteType?: string[]
 }
 
+interface FallbackWeatherData {
+  cityName: string
+  weather: string
+  temperature: string
+}
+
 const props = defineProps({
   componentSetting: {
     type: Object,
@@ -228,13 +237,77 @@ const STATION_INDEX_URL = import.meta.env.DEV
   ? '/awc-cache/stations.cache.json'
   : 'https://aviationweather.gov/data/cache/stations.cache.json'
 
+const IATA_TO_ICAO: Record<string, string> = {
+  PEK: 'ZBAA',
+  PKX: 'ZBAD',
+  PVG: 'ZSPD',
+  SHA: 'ZSSS',
+  CAN: 'ZGGG',
+  SZX: 'ZGSZ',
+  CTU: 'ZUUU',
+  TFU: 'ZUTF',
+  CKG: 'ZUCK',
+  KMG: 'ZPPP',
+  HGH: 'ZSHC',
+  NKG: 'ZSNJ',
+  XMN: 'ZSAM',
+  FOC: 'ZSFZ',
+  JJN: 'ZSQZ',
+  KHN: 'ZSCN',
+  TAO: 'ZSQD',
+  DLC: 'ZYTL',
+  SHE: 'ZYTX',
+  HRB: 'ZYHB',
+  CGQ: 'ZYCC',
+  CGO: 'ZHCC',
+  WUH: 'ZHHH',
+  CSX: 'ZGHA',
+  HFE: 'ZSOF',
+  XIY: 'ZLXY',
+  LHW: 'ZLLL',
+  XNN: 'ZLXN',
+  HET: 'ZBHH',
+  TSN: 'ZBTJ',
+  URC: 'ZWWW',
+  KWE: 'ZUGY',
+  LXA: 'ZULS',
+  HAK: 'ZJHK',
+  SYX: 'ZJSY',
+  WNZ: 'ZSWZ',
+  NTG: 'ZSNT',
+  SWA: 'ZGOW',
+  ZUH: 'ZGSD',
+  NGB: 'ZSNB',
+  SJW: 'ZBSJ',
+  TYN: 'ZBYN',
+  INC: 'ZLIC',
+  KWL: 'ZGKL',
+  NNG: 'ZGNN',
+  ZHA: 'ZGZJ',
+  LJG: 'ZPLJ',
+  EHU: 'ZHEC',
+  TNA: 'ZSJN',
+  YNT: 'ZSYT',
+  NDG: 'ZYQQ',
+  KHG: 'ZWSH',
+  HTN: 'ZWTN',
+  HMI: 'ZWHM'
+}
+
 const icaoCode = computed(() => {
-  const value = String(props.componentSetting.icaoCode || 'ZBAA').trim().toUpperCase()
-  return /^[A-Z0-9]{3,4}$/.test(value) ? value : 'ZBAA'
+  const raw = String(props.componentSetting.icaoCode || 'ZBAA').trim().toUpperCase()
+  const value = /^[A-Z0-9]{3,4}$/.test(raw) ? raw : 'ZBAA'
+  if (value.length === 3 && IATA_TO_ICAO[value]) {
+    return IATA_TO_ICAO[value]
+  }
+  return value
 })
 
 const metar = ref<MetarReport | null>(null)
 const taf = ref<TafReport | null>(null)
+const fallbackWeather = ref<FallbackWeatherData | null>(null)
+const isFallback = computed(() => !metar.value && !taf.value && Boolean(fallbackWeather.value))
+
 const loading = ref(true)
 const refreshing = ref(false)
 const errorMessage = ref('')
@@ -246,8 +319,13 @@ const stationIndexLoading = ref(false)
 const stationIndexError = ref('')
 const airportResults = ref<AirportStation[]>([])
 
-const hasData = computed(() => Boolean(metar.value || taf.value))
-const stationName = computed(() => metar.value?.name || taf.value?.name || '航空天气')
+const hasData = computed(() => Boolean(metar.value || taf.value || fallbackWeather.value))
+const stationName = computed(() => {
+  if (isFallback.value && fallbackWeather.value) {
+    return `${fallbackWeather.value.cityName} (回退模式)`
+  }
+  return metar.value?.name || taf.value?.name || '航空天气'
+})
 const detailURL = computed(() => `https://metar-taf.com/en/${icaoCode.value}`)
 
 const CHINESE_CITY_NAMES: Record<string, string> = {
@@ -273,9 +351,11 @@ const CHINESE_CITY_NAMES: Record<string, string> = {
   ZHCC: '郑州',
   ZHHH: '武汉',
   ZGHA: '长沙',
+  ZGCS: '长沙',
   ZSCN: '南昌',
   ZSOF: '合肥',
   ZLXY: '西安',
+  ZLSN: '西安',
   ZLLL: '兰州',
   ZLXN: '西宁',
   ZBHH: '呼和浩特',
@@ -284,7 +364,34 @@ const CHINESE_CITY_NAMES: Record<string, string> = {
   ZUGY: '贵阳',
   ZULS: '拉萨',
   ZJHK: '海口',
-  ZJSY: '三亚'
+  ZGHK: '海口',
+  ZJSY: '三亚',
+  ZSQZ: '泉州',
+  ZGOW: '揭阳',
+  ZGSD: '珠海',
+  ZSNB: '宁波',
+  ZSWZ: '温州',
+  ZSNT: '南通',
+  ZSGZ: '赣州',
+  ZBSJ: '石家庄',
+  ZBYN: '太原',
+  ZBDS: '鄂尔多斯',
+  ZLIC: '银川',
+  ZLJQ: '酒泉',
+  ZLYA: '延安',
+  ZGDY: '张家界',
+  ZGKL: '桂林',
+  ZGNN: '南宁',
+  ZGZJ: '湛江',
+  ZPLJ: '丽江',
+  ZHEC: '鄂州',
+  ZSJN: '济南',
+  ZSYT: '烟台',
+  ZYQQ: '齐齐哈尔',
+  ZWSH: '喀什',
+  ZWTN: '和田',
+  ZWHM: '哈密',
+  VHCH: '香港'
 }
 
 const extractCityName = (name: string) => {
@@ -296,10 +403,15 @@ const extractCityName = (name: string) => {
 }
 
 const cityLabel = computed(() => (
-  CHINESE_CITY_NAMES[icaoCode.value] || extractCityName(stationName.value)
+  (isFallback.value && fallbackWeather.value?.cityName)
+    ? fallbackWeather.value.cityName
+    : (CHINESE_CITY_NAMES[icaoCode.value] || extractCityName(stationName.value))
 ))
 
 const weatherCondition = computed(() => {
+  if (isFallback.value && fallbackWeather.value) {
+    return weatherFormatter(fallbackWeather.value.weather) || fallbackWeather.value.weather
+  }
   const weather = (metar.value?.wxString || '').toUpperCase()
   if (weather.includes('TS')) return '雷阵雨'
   if (weather.includes('FZRA') || weather.includes('PL')) return '雨夹雪'
@@ -326,9 +438,12 @@ const weatherIcon = computed(() => getWeatherIconURL(
   props.componentSetting.animationIcon !== false
 ))
 
-const temperatureText = computed(() => (
-  metar.value?.temp == null ? '--' : formatNumber(metar.value.temp)
-))
+const temperatureText = computed(() => {
+  if (isFallback.value && fallbackWeather.value) {
+    return fallbackWeather.value.temperature
+  }
+  return metar.value?.temp == null ? '--' : formatNumber(metar.value.temp)
+})
 
 const humidity = computed(() => {
   if (metar.value?.temp == null || metar.value.dewp == null) return null
@@ -341,9 +456,18 @@ const humidity = computed(() => {
   return Math.round(Math.min(100, Math.max(0, relativeHumidity)))
 })
 
-const humidityText = computed(() => humidity.value == null ? '--' : `${humidity.value}%`)
+const humidityText = computed(() => {
+  if (isFallback.value) return '--'
+  return humidity.value == null ? '--' : `${humidity.value}%`
+})
 
 const precipitationText = computed(() => {
+  if (isFallback.value) {
+    const cond = weatherCondition.value
+    if (cond.includes('雨')) return cond.includes('大') ? '大雨' : '有雨'
+    if (cond.includes('雪')) return '降雪'
+    return '无'
+  }
   const weather = (metar.value?.wxString || '').toUpperCase()
   if (weather.includes('TS')) return '雷雨'
   if (weather.includes('FZRA') || weather.includes('PL')) return '冻雨'
@@ -358,25 +482,38 @@ const precipitationText = computed(() => {
   return '无'
 })
 
+const airportDisplayName = (airport: AirportStation) => {
+  const chinese = CHINESE_CITY_NAMES[airport.icaoId]
+  if (chinese) {
+    return `${chinese} · ${airport.site || '机场'}`
+  }
+  return airport.site || 'Unnamed station'
+}
+
 const searchableText = (airport: AirportStation) => [
   airport.icaoId,
   airport.iataId,
   airport.faaId,
   airport.site,
   airport.state,
-  airport.country
+  airport.country,
+  CHINESE_CITY_NAMES[airport.icaoId] || ''
 ].filter(Boolean).join(' ').toUpperCase()
 
 const resultScore = (airport: AirportStation, keyword: string) => {
   const icao = airport.icaoId.toUpperCase()
   const iata = airport.iataId?.toUpperCase() || ''
   const site = airport.site?.toUpperCase() || ''
-  if (icao === keyword) return 0
-  if (iata === keyword) return 1
-  if (icao.startsWith(keyword) || iata.startsWith(keyword)) return 2
-  if (site.startsWith(keyword)) return 3
-  if (site.includes(keyword)) return 4
-  return 5
+  const chinese = (CHINESE_CITY_NAMES[airport.icaoId] || '').toUpperCase()
+  if (chinese === keyword) return 0
+  if (icao === keyword) return 1
+  if (iata === keyword) return 2
+  if (chinese.startsWith(keyword)) return 3
+  if (icao.startsWith(keyword) || iata.startsWith(keyword)) return 4
+  if (chinese.includes(keyword)) return 5
+  if (site.startsWith(keyword)) return 6
+  if (site.includes(keyword)) return 7
+  return 8
 }
 
 const updateAirportResults = () => {
@@ -496,6 +633,34 @@ const fetchReport = async <T,>(product: 'metar' | 'taf', signal: AbortSignal) =>
   return Array.isArray(reports) && reports.length ? reports[0] as T : null
 }
 
+const fetchUpstreamWeather = async (cityName: string): Promise<FallbackWeatherData | null> => {
+  try {
+    const districtRes = await request({
+      url: `/tapi/amap/v3/config/district?keywords=${encodeURIComponent(cityName)}&subdistrict=0`
+    })
+    if (districtRes?.status === '1' && Array.isArray(districtRes.districts) && districtRes.districts.length > 0) {
+      const cityInfo = districtRes.districts.find((item: any) => item.level === 'city') || districtRes.districts[0]
+      const adcode = cityInfo.adcode
+      if (adcode && !Number.isNaN(Number(adcode))) {
+        const weatherRes = await request({
+          url: `/tapi/amap/v3/weather/weatherInfo?extensions=base&city=${adcode}`
+        })
+        if (weatherRes?.status === '1' && Array.isArray(weatherRes.lives) && weatherRes.lives.length > 0) {
+          const live = weatherRes.lives[0]
+          return {
+            cityName: (cityInfo.name || cityName).replace(/[市城区]/g, ''),
+            weather: live.weather || '晴',
+            temperature: String(live.temperature ?? '--')
+          }
+        }
+      }
+    }
+  } catch (error) {
+    console.warn('获取上游高德天气回退数据失败:', error)
+  }
+  return null
+}
+
 let requestId = 0
 let controller: AbortController | null = null
 
@@ -515,14 +680,35 @@ const loadWeather = async () => {
 
   if (currentRequest !== requestId) return
 
-  if (results[0].status === 'fulfilled') metar.value = results[0].value
-  if (results[1].status === 'fulfilled') taf.value = results[1].value
+  const metarReport = results[0].status === 'fulfilled' ? results[0].value : null
+  const tafReport = results[1].status === 'fulfilled' ? results[1].value : null
+
+  metar.value = metarReport
+  taf.value = tafReport
+
+  // 若无可用航空数据，则触发回退到上游城市天气
+  if (!metarReport && !tafReport) {
+    const targetCity = CHINESE_CITY_NAMES[icaoCode.value] || extractCityName(stationName.value)
+    if (targetCity) {
+      const fallback = await fetchUpstreamWeather(targetCity)
+      if (currentRequest !== requestId) return
+      if (fallback) {
+        fallbackWeather.value = fallback
+        loading.value = false
+        refreshing.value = false
+        return
+      }
+    }
+    fallbackWeather.value = null
+  } else {
+    fallbackWeather.value = null
+  }
 
   const failures = results
     .filter((result): result is PromiseRejectedResult => result.status === 'rejected')
     .filter(result => result.reason?.name !== 'AbortError')
 
-  if (failures.length) {
+  if (failures.length && !hasData.value) {
     errorMessage.value = failures
       .map(result => result.reason instanceof Error ? result.reason.message : '天气请求失败')
       .join('；')
@@ -535,6 +721,7 @@ const loadWeather = async () => {
 watch(icaoCode, () => {
   metar.value = null
   taf.value = null
+  fallbackWeather.value = null
   loadWeather()
 }, { immediate: true })
 

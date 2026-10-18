@@ -9,19 +9,19 @@ export default {
   formConf(formData: any) {
     return {
       icaoCode: {
-        label: '机场 ICAO 码',
+        label: '机场代码',
         type: 'input',
         attrs: {
-          placeholder: '例如 ZBAA、KJFK、EGLL',
+          placeholder: '例如 ZBAA、ZSQZ、PEK、JJN',
           maxlength: 4,
           clearable: true
         },
-        tips: '使用机场 ICAO 码获取 METAR / TAF，并可跳转到 metar-taf.com 查看详情。',
+        tips: '支持 4 位 ICAO 码（如 ZBAA、ZSQZ）或 3 位 IATA 码（如 PEK、JJN）。若该机场无实时电报将自动回退为城市常规天气。',
         rules: [{
           required: true,
           validator: (_rule: any, value: any, callback: any) => {
             if (!/^[A-Za-z0-9]{3,4}$/.test(String(value || '').trim())) {
-              callback(new Error('请输入 3–4 位机场 ICAO 码'))
+              callback(new Error('请输入 3–4 位机场代码'))
               return
             }
             callback()
