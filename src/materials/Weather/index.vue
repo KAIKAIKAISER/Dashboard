@@ -79,24 +79,24 @@
             <div class="report-title">
               <strong>METAR</strong>
               <time v-if="metarTime">{{ metarTime }}</time>
-              <small v-else-if="isFallback" style="color: rgba(255, 255, 255, 0.45)">回退模式</small>
+              <small v-else-if="fallbackSource" style="color: rgba(255, 255, 255, 0.45)">回退模式</small>
             </div>
-            <p>{{ metar?.rawOb || (isFallback ? `${icaoCode} 暂无国际公开 METAR 报文` : '暂无 METAR') }}</p>
+            <p>{{ metar?.rawOb || (fallbackSource ? `${icaoCode} 暂无国际公开 METAR 报文` : '暂无 METAR') }}</p>
           </article>
 
           <article class="report">
             <div class="report-title">
               <strong>TAF</strong>
               <time v-if="tafTime">{{ tafTime }}</time>
-              <small v-else-if="isFallback" style="color: rgba(255, 255, 255, 0.45)">城市天气</small>
+              <small v-else-if="fallbackSource" style="color: rgba(255, 255, 255, 0.45)">气象数据</small>
             </div>
-            <p>{{ taf?.rawTAF || (isFallback ? `已自动回退至 ${cityLabel} 城市天气：${weatherCondition} ${temperatureText}°C` : '暂无 TAF') }}</p>
+            <p>{{ taf?.rawTAF || (fallbackSource ? `已自动回退至 ${cityLabel} 气象数据：${weatherCondition} ${temperatureText}°C · 湿度 ${humidityText}` : '暂无 TAF') }}</p>
           </article>
         </div>
 
         <footer>
           <span>
-            数据：{{ isFallback ? '高德天气 (回退模式)' : 'Aviation Weather Center' }}
+            数据：{{ footerSourceText }}
             <template v-if="refreshing"> · 更新中…</template>
             <template v-else-if="errorMessage"> · 部分数据更新失败</template>
           </span>
@@ -306,7 +306,14 @@ const icaoCode = computed(() => {
 const metar = ref<MetarReport | null>(null)
 const taf = ref<TafReport | null>(null)
 const fallbackWeather = ref<FallbackWeatherData | null>(null)
-const isFallback = computed(() => !metar.value && !taf.value && Boolean(fallbackWeather.value))
+const fallbackSource = ref<'open-meteo' | 'amap' | ''>('')
+const isFallback = computed(() => Boolean(fallbackSource.value))
+
+const footerSourceText = computed(() => {
+  if (fallbackSource.value === 'open-meteo') return 'Open-Meteo (气象数值回退)'
+  if (fallbackSource.value === 'amap') return '高德天气 (回退模式)'
+  return 'Aviation Weather Center'
+})
 
 const loading = ref(true)
 const refreshing = ref(false)
@@ -456,29 +463,19 @@ const humidity = computed(() => {
   return Math.round(Math.min(100, Math.max(0, relativeHumidity)))
 })
 
-const humidityText = computed(() => {
-  if (isFallback.value) return '--'
-  return humidity.value == null ? '--' : `${humidity.value}%`
-})
+const humidityText = computed(() => (humidity.value == null ? '--' : `${humidity.value}%`))
 
 const precipitationText = computed(() => {
-  if (isFallback.value) {
-    const cond = weatherCondition.value
-    if (cond.includes('雨')) return cond.includes('大') ? '大雨' : '有雨'
-    if (cond.includes('雪')) return '降雪'
-    return '无'
+  const precipitation = metar.value?.precip
+  if (precipitation != null && precipitation > 0) {
+    const millimeters = precipitation * 25.4
+    return `${millimeters < 0.1 ? '<0.1' : millimeters.toFixed(1)} mm`
   }
   const weather = (metar.value?.wxString || '').toUpperCase()
   if (weather.includes('TS')) return '雷雨'
   if (weather.includes('FZRA') || weather.includes('PL')) return '冻雨'
   if (weather.includes('SN') || weather.includes('SG')) return '降雪'
   if (weather.includes('RA') || weather.includes('DZ')) return weather.includes('+') ? '大雨' : '有雨'
-
-  const precipitation = metar.value?.precip
-  if (precipitation != null && precipitation > 0) {
-    const millimeters = precipitation * 25.4
-    return `${millimeters < 0.1 ? '<0.1' : millimeters.toFixed(1)} mm`
-  }
   return '无'
 })
 
@@ -633,6 +630,110 @@ const fetchReport = async <T,>(product: 'metar' | 'taf', signal: AbortSignal) =>
   return Array.isArray(reports) && reports.length ? reports[0] as T : null
 }
 
+const WMO_CODE_MAP: Record<number, { condition: string; cover: string; wxString: string }> = {
+  0: { condition: '晴', cover: 'CAVOK', wxString: '' },
+  1: { condition: '少云', cover: 'FEW', wxString: '' },
+  2: { condition: '晴间多云', cover: 'SCT', wxString: '' },
+  3: { condition: '多云', cover: 'BKN', wxString: '' },
+  45: { condition: '大雾', cover: 'OVC', wxString: 'FG' },
+  48: { condition: '大雾', cover: 'OVC', wxString: 'FG' },
+  51: { condition: '小雨', cover: 'OVC', wxString: 'DZ' },
+  53: { condition: '小雨', cover: 'OVC', wxString: 'DZ' },
+  55: { condition: '小雨', cover: 'OVC', wxString: 'DZ' },
+  56: { condition: '雨夹雪', cover: 'OVC', wxString: 'FZRA' },
+  57: { condition: '雨夹雪', cover: 'OVC', wxString: 'FZRA' },
+  61: { condition: '小雨', cover: 'OVC', wxString: 'RA' },
+  63: { condition: '中雨', cover: 'OVC', wxString: 'RA' },
+  65: { condition: '大雨', cover: 'OVC', wxString: '+RA' },
+  66: { condition: '雨夹雪', cover: 'OVC', wxString: 'PL' },
+  67: { condition: '雨夹雪', cover: 'OVC', wxString: 'PL' },
+  71: { condition: '雪', cover: 'OVC', wxString: 'SN' },
+  73: { condition: '雪', cover: 'OVC', wxString: 'SN' },
+  75: { condition: '雪', cover: 'OVC', wxString: '+SN' },
+  77: { condition: '雪', cover: 'OVC', wxString: 'SN' },
+  80: { condition: '小雨', cover: 'BKN', wxString: 'SHRA' },
+  81: { condition: '中雨', cover: 'BKN', wxString: 'SHRA' },
+  82: { condition: '大雨', cover: 'OVC', wxString: '+SHRA' },
+  85: { condition: '雪', cover: 'OVC', wxString: 'SHSN' },
+  86: { condition: '雪', cover: 'OVC', wxString: 'SHSN' },
+  95: { condition: '雷阵雨', cover: 'OVC', wxString: 'TSRA' },
+  96: { condition: '雷阵雨', cover: 'OVC', wxString: 'TSRA' },
+  99: { condition: '雷阵雨', cover: 'OVC', wxString: 'TSRA' }
+}
+
+const fetchStationCoords = async (icao: string): Promise<{ lat: number; lon: number } | null> => {
+  const found = stationIndex.value.find(s => s.icaoId === icao)
+  if (found && (found as any).lat != null && (found as any).lon != null) {
+    return { lat: Number((found as any).lat), lon: Number((found as any).lon) }
+  }
+
+  try {
+    const res = await fetch(`${API_BASE}/stationinfo?ids=${encodeURIComponent(icao)}&format=json`)
+    if (res.ok) {
+      const list = await res.json()
+      if (Array.isArray(list) && list.length > 0 && list[0].lat != null && list[0].lon != null) {
+        return { lat: Number(list[0].lat), lon: Number(list[0].lon) }
+      }
+    }
+  } catch (err) {
+    console.warn('获取机场坐标失败:', err)
+  }
+  return null
+}
+
+const fetchOpenMeteoWeather = async (coords: { lat: number; lon: number }, icao: string): Promise<MetarReport | null> => {
+  try {
+    const params = new URLSearchParams({
+      latitude: String(coords.lat),
+      longitude: String(coords.lon),
+      current: 'temperature_2m,relative_humidity_2m,dew_point_2m,precipitation,weather_code,surface_pressure,wind_speed_10m,wind_direction_10m,wind_gusts_10m,visibility',
+      wind_speed_unit: 'kn'
+    })
+    const res = await fetch(`https://api.open-meteo.com/v1/forecast?${params}`)
+    if (!res.ok) return null
+    const data = await res.json()
+    const current = data?.current
+    if (!current) return null
+
+    const wmo = WMO_CODE_MAP[current.weather_code] || { condition: '晴', cover: 'CAVOK', wxString: '' }
+    const visMiles = current.visibility != null ? (current.visibility / 1609.34) : null
+    const visStr = visMiles == null ? undefined : (visMiles >= 6 ? '6+' : visMiles.toFixed(1))
+
+    const d = new Date(current.time || Date.now())
+    const day = String(d.getUTCDate()).padStart(2, '0')
+    const hour = String(d.getUTCHours()).padStart(2, '0')
+    const min = String(d.getUTCMinutes()).padStart(2, '0')
+    const dir = String(Math.round(current.wind_direction_10m ?? 0)).padStart(3, '0')
+    const spd = String(Math.round(current.wind_speed_10m ?? 0)).padStart(2, '0')
+    const t = Math.round(current.temperature_2m ?? 0)
+    const tStr = t < 0 ? `M${Math.abs(t)}` : String(t).padStart(2, '0')
+    const dp = Math.round(current.dew_point_2m ?? 0)
+    const dpStr = dp < 0 ? `M${Math.abs(dp)}` : String(dp).padStart(2, '0')
+    const qnh = Math.round(current.surface_pressure ?? 1013)
+    const rawOb = `OBS ${icao} ${day}${hour}${min}Z ${dir}${spd}KT ${visStr ? (visStr === '6+' ? 'CAVOK' : `${visStr}SM`) : 'CAVOK'} ${tStr}/${dpStr} Q${qnh} (数值模式观测)`
+
+    return {
+      icaoId: icao,
+      name: stationName.value,
+      reportTime: current.time ? new Date(current.time).toISOString() : new Date().toISOString(),
+      temp: current.temperature_2m,
+      dewp: current.dew_point_2m,
+      altim: current.surface_pressure,
+      wdir: current.wind_direction_10m,
+      wspd: Math.round((current.wind_speed_10m ?? 0) * 10) / 10,
+      wgst: current.wind_gusts_10m != null ? Math.round(current.wind_gusts_10m * 10) / 10 : undefined,
+      visib: visStr,
+      precip: current.precipitation != null && current.precipitation > 0 ? current.precipitation / 25.4 : 0,
+      cover: wmo.cover,
+      wxString: wmo.wxString,
+      rawOb
+    }
+  } catch (err) {
+    console.warn('获取 Open-Meteo 高精度气象失败:', err)
+  }
+  return null
+}
+
 const fetchUpstreamWeather = async (cityName: string): Promise<FallbackWeatherData | null> => {
   try {
     const districtRes = await request({
@@ -686,22 +787,40 @@ const loadWeather = async () => {
   metar.value = metarReport
   taf.value = tafReport
 
-  // 若无可用航空数据，则触发回退到上游城市天气
-  if (!metarReport && !tafReport) {
+  // 若无可用 METAR 报文，先尝试从 Open-Meteo 获取完整气象要素（湿度、气压、露点、风等）
+  if (!metarReport) {
+    const coords = await fetchStationCoords(icaoCode.value)
+    if (coords) {
+      const openMeteoMetar = await fetchOpenMeteoWeather(coords, icaoCode.value)
+      if (currentRequest !== requestId) return
+      if (openMeteoMetar) {
+        metar.value = openMeteoMetar
+        fallbackSource.value = 'open-meteo'
+        fallbackWeather.value = null
+        loading.value = false
+        refreshing.value = false
+        return
+      }
+    }
+
+    // 若 Open-Meteo 异常，降级调用上游高德天气作为备用兜底
     const targetCity = CHINESE_CITY_NAMES[icaoCode.value] || extractCityName(stationName.value)
     if (targetCity) {
       const fallback = await fetchUpstreamWeather(targetCity)
       if (currentRequest !== requestId) return
       if (fallback) {
         fallbackWeather.value = fallback
+        fallbackSource.value = 'amap'
         loading.value = false
         refreshing.value = false
         return
       }
     }
     fallbackWeather.value = null
+    fallbackSource.value = ''
   } else {
     fallbackWeather.value = null
+    fallbackSource.value = ''
   }
 
   const failures = results
@@ -722,6 +841,7 @@ watch(icaoCode, () => {
   metar.value = null
   taf.value = null
   fallbackWeather.value = null
+  fallbackSource.value = ''
   loadWeather()
 }, { immediate: true })
 

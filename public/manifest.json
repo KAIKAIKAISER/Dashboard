@@ -10,7 +10,8 @@
   ],
   "host_permissions": [
     "https://aviationweather.gov/*",
-    "https://kongfandong.cn/*"
+    "https://kongfandong.cn/*",
+    "https://api.open-meteo.com/*"
   ],
   "background": {
     "service_worker": "sw.js"
@@ -20,7 +21,7 @@
     "default_icon": "favicon.png"
   },
   "content_security_policy": {
-    "extension_pages": "script-src 'self'; connect-src 'self' https://aviationweather.gov https://kongfandong.cn; img-src 'self' data: blob: https:; media-src 'self' blob: https:; frame-src 'self' https:; object-src 'self'"
+    "extension_pages": "script-src 'self'; connect-src 'self' https://aviationweather.gov https://kongfandong.cn https://api.open-meteo.com; img-src 'self' data: blob: https:; media-src 'self' blob: https:; frame-src 'self' https:; object-src 'self'"
   },
   "offline_enabled": true,
   "manifest_version": 3,
