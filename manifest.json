@@ -8,12 +8,21 @@
   "permissions": [
     "tabs"
   ],
+  "host_permissions": [
+    "https://aviationweather.gov/*",
+    "https://kongfandong.cn/*",
+    "https://api.open-meteo.com/*",
+    "https://wttr.in/*"
+  ],
   "background": {
     "service_worker": "sw.js"
   },
   "action": {
     "default_popup": "popup.html",
     "default_icon": "favicon.png"
+  },
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; connect-src 'self' https://aviationweather.gov https://kongfandong.cn https://api.open-meteo.com https://wttr.in; img-src 'self' data: blob: https:; media-src 'self' blob: https:; frame-src 'self' https:; object-src 'self'"
   },
   "offline_enabled": true,
   "manifest_version": 3,
